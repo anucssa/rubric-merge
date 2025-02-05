@@ -50,6 +50,8 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              openssl
+              pkg-config
               rust-bin.stable.latest.default
               dive
             ];
