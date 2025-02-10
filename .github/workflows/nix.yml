@@ -25,4 +25,7 @@ jobs:
     - run: nix build
     - run: docker load < result
     - run: docker push ghcr.io/anucssa/rubric-merge:latest
+    - run: nix build .#bin
+    - uses: actions/upload-artifact@v4
+      path: ./results/bin/rubric-merge
 
