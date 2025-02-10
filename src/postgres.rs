@@ -19,10 +19,13 @@ impl QPayMember {
         let last_name = name_words.into_iter().join(" ");
 
         let uid = {
-            let mut uid: &str = self
+            let owned_uid = self
                 .responses
                 .get("Student Number")
-                .ok_or_eyre("No response to question")?;
+                .ok_or_eyre("No response to question")?
+                .to_ascii_lowercase();
+
+            let mut uid = owned_uid.as_str();
 
             if uid.starts_with("u") {
                 uid = &uid[1..];

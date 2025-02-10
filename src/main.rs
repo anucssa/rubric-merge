@@ -19,7 +19,7 @@ fn main() -> Result<()> {
     let qpay_details = qpay::qpay_request()?;
     let members = qpay_details.all_memberships;
 
-    for qpay_user in members {
+    for mut qpay_user in members {
         if qpay_user.in_membership_db(&mut pg, &table) {
             continue;
         }
