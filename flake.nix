@@ -8,9 +8,9 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    crane = {
-      url = "github:ipetkov/crane";
-    };
+
+    fenix.url = "github:nix-community/fenix";
+    naersk.url = "github:nix-community/naersk";
   };
 
   outputs =
@@ -19,7 +19,8 @@
       nixpkgs,
       rust-overlay,
       flake-utils,
-      crane,
+      naersk,
+      fenix,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -31,13 +32,24 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        craneLib = crane.mkLib pkgs;
+        toolchain =
+          with fenix.packages.${system};
+          combine [
+            minimal.rustc
+            minimal.cargo
+            targets.x86_64-unknown-linux-musl.latest.rust-std
+          ];
+
+        naersk' = naersk.lib.${system}.override {
+          cargo = toolchain;
+          rustc = toolchain;
+        };
       in
       {
         packages = rec {
           bin = package {
             inherit pkgs;
-            craneLib = craneLib;
+            naersk = naersk';
           };
           docker = docker-image {
             inherit pkgs;
