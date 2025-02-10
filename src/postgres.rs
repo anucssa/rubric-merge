@@ -4,13 +4,45 @@ use color_eyre::Result;
 use eyre::Context as _;
 use itertools::Itertools;
 
+pub enum InDb {
+    Full,
+    NeedsDiscord,
+    Empty,
+}
+
 impl QPayMember {
-    pub fn in_membership_db(&self, db: &mut postgres::Client, table: &str) -> bool {
-        let result = db.query_one(
-            &format!("SELECT * FROM {table} WHERE email = $1"),
+    pub fn in_membership_db(&self, db: &mut postgres::Client, table: &str) -> InDb {
+        match db.query_one(
+            &format!("SELECT discord_username FROM {table} WHERE email = $1"),
             &[&self.email],
-        );
-        result.is_ok()
+        ) {
+            Ok(row) => match row.get::<_, Option<&str>>("discord_username") {
+                Some(_) => InDb::Full,
+                None => InDb::NeedsDiscord,
+            },
+            Err(_) => InDb::Empty,
+        }
+    }
+
+    pub fn add_username(&self, db: &mut postgres::Client, table: &str) -> Result<()> {
+        match self
+            .responses
+            .get("Do you have a discord username? If so, what is it?")
+            .and_then(|input| match input.is_empty() {
+                true => None,
+                false => Some(input),
+            }) {
+            None => Ok(()),
+            Some(username) => {
+                let query = format!("UPDATE {table} SET discord_username = $1 WHERE email = $2",);
+
+                let _result = db
+                    .query(&query, &[username, &self.email])
+                    .with_context(|| "Updating")?;
+
+                Ok(())
+            }
+        }
     }
 
     pub fn create_membership(&self, db: &mut postgres::Client, table: &str) -> Result<()> {

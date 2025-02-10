@@ -19,14 +19,16 @@ fn main() -> Result<()> {
     let qpay_details = qpay::qpay_request()?;
     let members = qpay_details.all_memberships;
 
-    for mut qpay_user in members {
-        if qpay_user.in_membership_db(&mut pg, &table) {
-            continue;
+    for qpay_user in members {
+        match qpay_user.in_membership_db(&mut pg, &table) {
+            postgres::InDb::Empty => qpay_user
+                .create_membership(&mut pg, &table)
+                .with_context(|| format!("{:#?}", qpay_user))?,
+            postgres::InDb::NeedsDiscord => qpay_user
+                .add_username(&mut pg, &table)
+                .with_context(|| format!("{:#?}", qpay_user))?,
+            _ => (),
         }
-
-        qpay_user
-            .create_membership(&mut pg, &table)
-            .with_context(|| format!("{:#?}", qpay_user))?;
     }
 
     Ok(())
