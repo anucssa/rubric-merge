@@ -24,6 +24,7 @@ fn main() -> Result<()> {
 
     let mut crobot_updates = Vec::new();
 
+    let mut imported = 0;
     for qpay_user in members {
         match qpay_user.in_membership_db(&mut pg, &table) {
             postgres::InDb::Empty => {
@@ -36,6 +37,8 @@ fn main() -> Result<()> {
                         .add_username(&mut pg, &table)
                         .with_context(|| format!("{:#?}", qpay_user))?,
                 );
+
+                imported += 1;
             }
             postgres::InDb::NeedsDiscord => crobot_updates.push(
                 qpay_user
@@ -46,7 +49,12 @@ fn main() -> Result<()> {
         }
     }
 
-    crobot::send_webhook(crobot_updates)?;
+    let discord_imported = crobot::send_webhook(crobot_updates)?;
+
+    println!(
+        "Imported {}, {} discord usernames",
+        imported, discord_imported
+    );
 
     Ok(())
 }

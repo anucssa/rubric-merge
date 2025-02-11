@@ -39,14 +39,15 @@ impl NocoWebook {
     }
 }
 
-pub fn send_webhook(updates: Vec<Option<CrobotWebook>>) -> Result<()> {
+pub fn send_webhook(updates: Vec<Option<CrobotWebook>>) -> Result<usize> {
     let Some((hook, secret)) = crobot_webhook()? else {
-        return Ok(());
+        return Ok(0);
     };
 
     let users: Vec<_> = updates.into_iter().filter_map(|a| a).collect();
-    if users.len() == 0 {
-        return Ok(());
+    let user_count = users.len();
+    if user_count == 0 {
+        return Ok(0);
     }
 
     let body = NocoWebook::new(users);
@@ -62,7 +63,7 @@ pub fn send_webhook(updates: Vec<Option<CrobotWebook>>) -> Result<()> {
         .send()
         .with_context(|| "Updating crobot discord users")?;
 
-    Ok(())
+    Ok(user_count)
 }
 
 fn crobot_webhook() -> Result<Option<(String, String)>> {
