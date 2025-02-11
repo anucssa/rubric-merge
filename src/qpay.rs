@@ -4,6 +4,8 @@ use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use serde::Deserialize;
 use std::{collections::HashMap, env::var};
 
+use crate::APP_USER_AGENT;
+
 #[derive(Deserialize, Debug)]
 pub struct QPayResponse {
     #[serde(alias = "allMemberships")]
@@ -40,7 +42,7 @@ pub fn qpay_request() -> Result<QPayResponse> {
     let res = client
         .post("https://appserver.getqpay.com:9090/AppServerSwapnil/getSocietyPortalMembershipList")
         .body(body)
-        .header(USER_AGENT, "CSSA rubric merge")
+        .header(USER_AGENT, APP_USER_AGENT)
         .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
         .send()
         .with_context(|| "qpay appserver post request")?

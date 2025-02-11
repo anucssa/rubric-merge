@@ -1,3 +1,6 @@
+use std::env::var;
+
+use crate::crobot::CrobotWebook;
 use crate::qpay::QPayMember;
 use color_eyre::eyre::OptionExt as _;
 use color_eyre::Result;
@@ -24,7 +27,11 @@ impl QPayMember {
         }
     }
 
-    pub fn add_username(&self, db: &mut postgres::Client, table: &str) -> Result<()> {
+    pub fn add_username(
+        &self,
+        db: &mut postgres::Client,
+        table: &str,
+    ) -> Result<Option<CrobotWebook>> {
         match self
             .responses
             .get("Do you have a discord username? If so, what is it?")
@@ -32,7 +39,7 @@ impl QPayMember {
                 true => None,
                 false => Some(input),
             }) {
-            None => Ok(()),
+            None => Ok(None),
             Some(username) => {
                 let query = format!("UPDATE {table} SET discord_username = $1 WHERE email = $2",);
 
@@ -40,7 +47,7 @@ impl QPayMember {
                     .query(&query, &[username, &self.email])
                     .with_context(|| "Updating")?;
 
-                Ok(())
+                Ok(Some(CrobotWebook::new(username.to_owned())))
             }
         }
     }
