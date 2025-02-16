@@ -28,7 +28,6 @@
       let
         overlays = [ (import rust-overlay) ];
         package = import ./nix/package.nix;
-        docker-image = import ./nix/docker-image.nix;
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -51,11 +50,7 @@
             inherit pkgs;
             naersk = naersk';
           };
-          docker = docker-image {
-            inherit pkgs;
-            bin = bin;
-          };
-          default = docker;
+          default = bin;
         };
 
         devShells.default =
