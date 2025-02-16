@@ -60,4 +60,10 @@ impl QPayMember {
             .get("Are you a domestic or international student?")
             .map(|s| s.as_str())
     }
+
+    pub fn discord(&self) -> Option<&'_ str> {
+        self.responses
+            .get("Do you have a discord username? If so, what is it?")
+            .map(|s| s.as_str())
+    }
 }

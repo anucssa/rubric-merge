@@ -21,7 +21,9 @@ impl QPayMember {
             &format!("SELECT discord_username, origination FROM {table} WHERE email = $1"),
             &[&self.email],
         ) {
-            Ok(row) if row_missing(&row, "discord_username") => InDb::NeedsDiscord,
+            Ok(row) if self.discord().is_some() && row_missing(&row, "discord_username") => {
+                InDb::NeedsDiscord
+            }
             Ok(row) if self.origination().is_some() && row_missing(&row, "origination") => {
                 InDb::NeedsOrigination
             }
@@ -36,24 +38,17 @@ impl QPayMember {
         db: &mut postgres::Client,
         table: &str,
     ) -> Result<Option<CrobotWebook>> {
-        match self
-            .responses
-            .get("Do you have a discord username? If so, what is it?")
-            .and_then(|input| match input.is_empty() {
-                true => None,
-                false => Some(input),
-            }) {
-            None => Ok(None),
-            Some(username) => {
-                let query = format!("UPDATE {table} SET discord_username = $1 WHERE email = $2",);
+        let Some(username) = self.discord() else {
+            return Ok(None);
+        };
 
-                let _result = db
-                    .query(&query, &[username, &self.email])
-                    .with_context(|| "Updating")?;
+        let query = format!("UPDATE {table} SET discord_username = $1 WHERE email = $2",);
 
-                Ok(Some(CrobotWebook::new(username.to_owned())))
-            }
-        }
+        let _result = db
+            .query(&query, &[&username, &self.email])
+            .with_context(|| "Updating")?;
+
+        Ok(Some(CrobotWebook::new(username.to_owned())))
     }
 
     pub fn create_membership(&self, db: &mut postgres::Client, table: &str) -> Result<()> {
