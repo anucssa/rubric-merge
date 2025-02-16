@@ -25,16 +25,20 @@ fn main() -> Result<()> {
     let mut crobot_updates = Vec::new();
 
     let mut imported = 0;
+    let mut originated = 0;
+
     for qpay_user in members {
         match qpay_user.in_membership_db(&mut pg, &table) {
             postgres::InDb::Empty => {
                 qpay_user
                     .create_membership(&mut pg, &table)
+                    .with_context(|| "Importing member")
                     .with_context(|| format!("{:#?}", qpay_user))?;
 
                 crobot_updates.push(
                     qpay_user
                         .add_username(&mut pg, &table)
+                        .with_context(|| "Importing discord")
                         .with_context(|| format!("{:#?}", qpay_user))?,
                 );
 
@@ -43,17 +47,26 @@ fn main() -> Result<()> {
             postgres::InDb::NeedsDiscord => crobot_updates.push(
                 qpay_user
                     .add_username(&mut pg, &table)
+                    .with_context(|| "Importing discord")
                     .with_context(|| format!("{:#?}", qpay_user))?,
             ),
-            _ => (),
+            postgres::InDb::NeedsOrigination => {
+                qpay_user
+                    .add_origination(&mut pg, &table)
+                    .with_context(|| "Importing origination")
+                    .with_context(|| format!("{:#?}", qpay_user))?;
+                originated += 1;
+                ()
+            }
+            postgres::InDb::Full => (),
         }
     }
 
     let discord_imported = crobot::send_webhook(crobot_updates)?;
 
     println!(
-        "Imported {}, {} discord usernames",
-        imported, discord_imported
+        "Imported {}, {} discord usernames, {} originated",
+        imported, discord_imported, originated
     );
 
     Ok(())

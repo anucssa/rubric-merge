@@ -1,28 +1,32 @@
-use std::env::var;
-
 use crate::crobot::CrobotWebook;
 use crate::qpay::QPayMember;
 use color_eyre::eyre::OptionExt as _;
 use color_eyre::Result;
 use eyre::Context as _;
 use itertools::Itertools;
+use postgres::Row;
 
 pub enum InDb {
     Full,
+    NeedsOrigination,
     NeedsDiscord,
     Empty,
 }
 
 impl QPayMember {
     pub fn in_membership_db(&self, db: &mut postgres::Client, table: &str) -> InDb {
+        let row_missing = |row: &Row, query| row.get::<_, Option<&str>>(query).is_none();
+
         match db.query_one(
-            &format!("SELECT discord_username FROM {table} WHERE email = $1"),
+            &format!("SELECT discord_username, origination FROM {table} WHERE email = $1"),
             &[&self.email],
         ) {
-            Ok(row) => match row.get::<_, Option<&str>>("discord_username") {
-                Some(_) => InDb::Full,
-                None => InDb::NeedsDiscord,
-            },
+            Ok(row) if row_missing(&row, "discord_username") => InDb::NeedsDiscord,
+            Ok(row) if self.origination().is_some() && row_missing(&row, "origination") => {
+                InDb::NeedsOrigination
+            }
+
+            Ok(_) => InDb::Full,
             Err(_) => InDb::Empty,
         }
     }
@@ -105,6 +109,22 @@ impl QPayMember {
                 ],
             )
             .with_context(|| "Inserting")?;
+
+        Ok(())
+    }
+
+    pub fn add_origination(&self, db: &mut postgres::Client, table: &str) -> Result<()> {
+        let origination = self.origination();
+
+        let Some(origination) = origination else {
+            return Ok(());
+        };
+
+        let query = format!("UPDATE {table} SET origination = $1 WHERE email = $2",);
+
+        let _result = db
+            .query(&query, &[&origination, &self.email])
+            .with_context(|| "Updating")?;
 
         Ok(())
     }

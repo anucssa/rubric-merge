@@ -54,5 +54,10 @@ pub fn qpay_request() -> Result<QPayResponse> {
         .with_context(|| res)
 }
 
-#[cfg(test)]
-mod test {}
+impl QPayMember {
+    pub fn origination(&self) -> Option<&'_ str> {
+        self.responses
+            .get("Are you a domestic or international student?")
+            .map(|s| s.as_str())
+    }
+}
