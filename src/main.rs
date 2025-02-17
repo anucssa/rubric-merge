@@ -37,16 +37,16 @@ fn main() -> Result<()> {
 
                 crobot_updates.push(
                     qpay_user
-                        .add_username(&mut pg, &table)
+                        .set_username(&mut pg, &table, qpay_user.discord())
                         .with_context(|| "Importing discord")
                         .with_context(|| format!("{:#?}", qpay_user))?,
                 );
 
                 imported += 1;
             }
-            postgres::InDb::NeedsDiscord => crobot_updates.push(
+            postgres::InDb::NeedsDiscord(username) => crobot_updates.push(
                 qpay_user
-                    .add_username(&mut pg, &table)
+                    .set_username(&mut pg, &table, username)
                     .with_context(|| "Importing discord")
                     .with_context(|| format!("{:#?}", qpay_user))?,
             ),
@@ -57,6 +57,12 @@ fn main() -> Result<()> {
                     .with_context(|| format!("{:#?}", qpay_user))?;
                 originated += 1;
                 ()
+            }
+            postgres::InDb::NeedsDiscordRemoval => {
+                qpay_user
+                    .set_username(&mut pg, &table, None)
+                    .with_context(|| "Importing discord")
+                    .with_context(|| format!("{:#?}", qpay_user))?;
             }
             postgres::InDb::Full => (),
         }

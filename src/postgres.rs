@@ -6,10 +6,11 @@ use eyre::Context as _;
 use itertools::Itertools;
 use postgres::Row;
 
-pub enum InDb {
+pub enum InDb<'a> {
     Full,
+    NeedsDiscordRemoval,
     NeedsOrigination,
-    NeedsDiscord,
+    NeedsDiscord(Option<&'a str>),
     Empty,
 }
 
@@ -17,15 +18,26 @@ impl QPayMember {
     pub fn in_membership_db(&self, db: &mut postgres::Client, table: &str) -> InDb {
         let row_missing = |row: &Row, query| row.get::<_, Option<&str>>(query).is_none();
 
+        let discord = self.discord();
+        let discord_exists = discord
+            .map(|u| {
+                let simple = u.trim().to_lowercase();
+                !simple.is_empty() && simple != "no" && simple != "n/a"
+            })
+            .unwrap_or(false);
+
         match db.query_one(
             &format!("SELECT discord_username, origination FROM {table} WHERE email = $1"),
             &[&self.email],
         ) {
-            Ok(row) if self.discord().is_some() && row_missing(&row, "discord_username") => {
-                InDb::NeedsDiscord
+            Ok(row) if discord_exists && row_missing(&row, "discord_username") => {
+                InDb::NeedsDiscord(discord)
             }
             Ok(row) if self.origination().is_some() && row_missing(&row, "origination") => {
                 InDb::NeedsOrigination
+            }
+            Ok(row) if !discord_exists && !row_missing(&row, "discord_username") => {
+                InDb::NeedsDiscordRemoval
             }
 
             Ok(_) => InDb::Full,
@@ -33,21 +45,21 @@ impl QPayMember {
         }
     }
 
-    pub fn add_username(
+    pub fn set_username(
         &self,
         db: &mut postgres::Client,
         table: &str,
+        username: Option<&str>,
     ) -> Result<Option<CrobotWebook>> {
-        let Some(username) = self.discord() else {
-            return Ok(None);
-        };
-
         let query = format!("UPDATE {table} SET discord_username = $1 WHERE email = $2",);
 
         let _result = db
             .query(&query, &[&username, &self.email])
             .with_context(|| "Updating")?;
 
+        let Some(username) = username else {
+            return Ok(None);
+        };
         Ok(Some(CrobotWebook::new(username.to_owned())))
     }
 
