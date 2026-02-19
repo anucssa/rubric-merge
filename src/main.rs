@@ -30,10 +30,14 @@ fn main() -> Result<()> {
     for qpay_user in members {
         match qpay_user.in_membership_db(&mut pg, &table) {
             postgres::InDb::Empty => {
-                qpay_user
+                if let Err(e) = qpay_user
                     .create_membership(&mut pg, &table)
                     .with_context(|| "Importing member")
-                    .with_context(|| format!("{:#?}", qpay_user))?;
+                    .with_context(|| format!("{:#?}", qpay_user))
+                {
+                    eprintln!("{e}");
+                    continue;
+                }
 
                 crobot_updates.push(
                     qpay_user
